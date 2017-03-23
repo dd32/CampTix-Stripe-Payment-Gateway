@@ -1,12 +1,5 @@
 <?php
 
-add_action( 'all', function() {
-	$filter = current_filter();
-	if ( 'camptix_' == substr( $filter, 0, 8 ) ) {
-	//	var_dump( $filter );
-	}
-} );
-
 class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 	public $id = 'stripe';
 	public $name = 'Stripe';
