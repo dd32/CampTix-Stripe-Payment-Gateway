@@ -32,7 +32,6 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 			'api_predef' => '',
 		), $this->get_payment_options() );
 
-		add_action( 'template_redirect', array( $this, 'template_redirect' ) );
 //		add_action( 'camptix_attendee_form_before_input', array( $this, 'camptix_attendee_form_before_input' ), 10, 200 );
 		add_filter( 'camptix_register_registration_info_header', array( $this, 'camptix_register_registration_info_header' ) );
 
@@ -229,73 +228,6 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 		}
 
 		return $output;
-	}
-
-	/**
-	 * Watch for and process Stripe requests
-	 */
-	function template_redirect() {
-		if ( ! isset( $_REQUEST['tix_payment_method'] ) || 'stripe' != $_REQUEST['tix_payment_method'] ) {
-			return;
-		}
-
-		if ( isset( $_GET['tix_action'] ) ) {
-			if ( 'payment_cancel' == $_GET['tix_action'] ) {
-				$this->payment_cancel();
-			}
-
-			if ( 'payment_return' == $_GET['tix_action'] ) {
-				$this->payment_return();
-			}
-
-			if ( 'payment_notify' == $_GET['tix_action'] ) {
-				$this->payment_notify();
-			}
-		}
-	}
-
-	/**
-	 * Handle a canceled payment
-	 *
-	 * Runs when the user cancels their payment during checkout at PayPal.
-	 * his will simply tell CampTix to put the created attendee drafts into to Cancelled state.
-	 *
-	 * @return int One of the CampTix_Plugin::PAYMENT_STATUS_{status} constants
-	 */
-	function payment_cancel() {
-		/** @var $camptix CampTix_Plugin */
-		global $camptix;
-
-		$camptix->log( sprintf( 'Running payment_cancel. Request data attached.' ), null, $_REQUEST );
-		$camptix->log( sprintf( 'Running payment_cancel. Server data attached.'  ), null, $_SERVER );
-
-		$payment_token = ( isset( $_REQUEST['tix_payment_token'] ) ) ? trim( $_REQUEST['tix_payment_token'] ) : '';
-		$paypal_token = ( isset( $_REQUEST['token'] ) ) ? trim( $_REQUEST['token'] ) : '';
-
-		if ( ! $payment_token || ! $paypal_token ) {
-			wp_die( 'empty token' );
-		}
-
-		$attendees = get_posts( array(
-			'posts_per_page' => 1,
-			'post_type'      => 'tix_attendee',
-			'post_status'    => 'any',
-			'meta_query'     => array(
-				array(
-					'key'     => 'tix_payment_token',
-					'compare' => '=',
-					'value'   => $payment_token,
-					'type'    => 'CHAR',
-				),
-			),
-		) );
-
-		if ( ! $attendees ) {
-			die( 'attendees not found' );
-		}
-
-		// Set the associated attendees to cancelled.
-		return $camptix->payment_result( $payment_token, CampTix_Plugin::PAYMENT_STATUS_CANCELLED );
 	}
 
 	/**
