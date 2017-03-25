@@ -361,11 +361,10 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 		$result = $this->send_refund_request( $payment_token );
 
 		if ( CampTix_Plugin::PAYMENT_STATUS_REFUNDED != $result['status'] ) {
-			$error_code    = isset( $result['refund_transaction_details']['L_ERRORCODE0'] )   ? $result['refund_transaction_details']['L_ERRORCODE0']   : 0;
-			$error_message = isset( $result['refund_transaction_details']['L_LONGMESSAGE0'] ) ? $result['refund_transaction_details']['L_LONGMESSAGE0'] : '';
+			$error_message = $result['refund_transaction_details'];
 
 			if ( ! empty( $error_message ) ) {
-				$camptix->error( sprintf( __( 'PayPal error: %s (%d)', 'camptix-stripe-payment-gateway' ), $error_message, $error_code ) );
+				$camptix->error( sprintf( __( 'Stripe error: %s', 'camptix-stripe-payment-gateway' ), $error_message ) );
 			}
 		}
 
@@ -395,38 +394,21 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 			'token'          => $payment_token,
 			'transaction_id' => $camptix->get_post_meta_from_payment_token( $payment_token, 'tix_transaction_id' ),
 		);
-
-		// Craft and submit the request
-		$payload = array(
-			'METHOD'        => 'RefundTransaction',
-			'TRANSACTIONID' => $result['transaction_id'],
-			'REFUNDTYPE'    => 'Full',
-		);
-		$response = $this->request( $payload );
-
-		// Process PayPal's response
-		if ( is_wp_error( $response ) ) {
-			// HTTP request failed, so mimic the response structure to provide a consistent response format
-			$response = array(
-				'ACK'            => 'Failure',
-				'L_ERRORCODE0'   => 0,
-				'L_LONGMESSAGE0' => __( 'Request did not complete successfully', 'camptix-stripe-payment-gateway' ),	// don't reveal the raw error message to the user in case it contains sensitive network/server/application-layer data. It will be logged instead later on.
-				'raw'            => $response,
-			);
-		} else {
-			$response = wp_parse_args( wp_remote_retrieve_body( $response ) );
-		}
-
-		if ( isset( $response['ACK'], $response['REFUNDTRANSACTIONID'] ) && 'Success' == $response['ACK'] ) {
-			$result['refund_transaction_id']      = $response['REFUNDTRANSACTIONID'];
-			$result['refund_transaction_details'] = $response;
-			$result['status']                     = $this->get_status_from_string( $response['REFUNDSTATUS'] );
-		} else {
+		
+		try {
+			$charge = \Stripe\Refund::create( array(
+				'charge' => $result['transaction_id'],
+			) );
+			
+			$result['refund_transaction_id']      = $charge->id;
+			$result['refund_transaction_details'] = $charge;
+			$result['status']                     = CampTix_Plugin::PAYMENT_STATUS_REFUNDED;
+		} catch( Exception $e ) {
 			$result['refund_transaction_id']      = false;
-			$result['refund_transaction_details'] = $response;
+			$result['refund_transaction_details'] = $e->getMessage();
 			$result['status']                     = CampTix_Plugin::PAYMENT_STATUS_REFUND_FAILED;
 
-			$camptix->log( 'Error during RefundTransaction.', null, $response );
+			$camptix->log( 'Error during RefundTransaction.', null, $e->getMessage() );
 		}
 
 		return $result;
