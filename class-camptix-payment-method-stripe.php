@@ -32,7 +32,6 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 			'api_predef' => '',
 		), $this->get_payment_options() );
 
-//		add_action( 'camptix_attendee_form_before_input', array( $this, 'camptix_attendee_form_before_input' ), 10, 200 );
 		add_filter( 'camptix_register_registration_info_header', array( $this, 'camptix_register_registration_info_header' ) );
 
 		require_once __DIR__ . '/stripe-php/init.php';
@@ -287,46 +286,13 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 				'idempotency_key' => $payment_token,
 			) );
 
-		} catch( \Stripe\Error\Card $e ) {
-			// Since it's a decline, \Stripe\Error\Card will be caught
-			return $camptix->payment_result( $payment_token, CampTix_Plugin::PAYMENT_STATUS_FAILED, array(
-				'error_code' => 'declined',
-				'raw' => $e->getJsonBody(),
-			) );
-		} catch( \Stripe\Error\RateLimit $e ) {
-			// Too many requests made to the API too quickly
-			return $camptix->payment_result( $payment_token, CampTix_Plugin::PAYMENT_STATUS_FAILED, array(
-				'error_code' => 'ratelimit',
-				'raw' => $e->getJsonBody(),
-			) );
-		} catch( \Stripe\Error\InvalidRequest $e ) {
-			// Invalid parameters were supplied to Stripe's API
-			return $camptix->payment_result( $payment_token, CampTix_Plugin::PAYMENT_STATUS_FAILED, array(
-				'error_code' => 'invalid_request',
-				'raw' => $e->getJsonBody(),
-			) );
-		} catch( \Stripe\Error\Authentication $e ) {
-			// Authentication with Stripe's API failed
-			// (maybe you changed API keys recently)
-			return $camptix->payment_result( $payment_token, CampTix_Plugin::PAYMENT_STATUS_FAILED, array(
-				'error_code' => 'authentication_failed',
-				'raw' => $e->getJsonBody(),
-			) );
-		} catch( \Stripe\Error\ApiConnection $e ) {
-			// Network communication with Stripe failed
-			return $camptix->payment_result( $payment_token, CampTix_Plugin::PAYMENT_STATUS_FAILED, array(
-				'error_code' => 'network_error',
-				'raw' => $e->getJsonBody(),
-			) );
-		} catch( \Stripe\Error\Base $e ) {
-			// Display a very generic error to the user, and maybe send
-			// yourself an email
-			return $camptix->payment_result( $payment_token, CampTix_Plugin::PAYMENT_STATUS_FAILED, array(
-				'error_code' => 'request_failed',
-				'raw' => $e->getJsonBody(),
-			) );
 		} catch( Exception $e ) {
-			// Something else happened, completely unrelated to Stripe
+			// A failure happened, since we don't expose the exact details to the user we'll catch every failure here.
+			// Remvoe the POST param of the token so it's not used again.
+			unset( $_POST['tix_stripe_token'] );
+
+			$camptix->log( 'Error during Charge.', null, $e->getMessage() );
+
 			return $camptix->payment_result( $payment_token, CampTix_Plugin::PAYMENT_STATUS_FAILED, array(
 				'error_code' => 'request_failed',
 				'raw' => $e->getJsonBody(),
