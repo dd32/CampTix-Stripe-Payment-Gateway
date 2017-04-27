@@ -5,7 +5,7 @@
  * Description: Stripe Payment Gateway Support for CampTix
  * Author: Dion Hulse
  * Author URI: https://dd32.id.au/
- * Version: 0.1beta
+ * Version: 0.2-beta
  * License: GPLv2 or later
  * Text Domain: camptix-stripe-payment-gateway
  */
