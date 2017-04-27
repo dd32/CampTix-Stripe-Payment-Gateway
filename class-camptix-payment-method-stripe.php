@@ -34,6 +34,8 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 
 		add_filter( 'camptix_register_registration_info_header', array( $this, 'camptix_register_registration_info_header' ) );
 
+		add_filter( 'camptix_payment_result', array( $this, 'camptix_payment_result' ), 10, 3 );
+
 		require_once __DIR__ . '/stripe-php/init.php';
 
 		\Stripe\Stripe::setAppInfo("CampTix", "1.0", "https://github.com/dd32/CampTix-Stripe-Payment-Gateway");
@@ -293,9 +295,12 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 
 			$camptix->log( 'Error during Charge.', null, $e->getMessage() );
 
+			$json_body = $e->getJsonBody();
 			return $camptix->payment_result( $payment_token, CampTix_Plugin::PAYMENT_STATUS_FAILED, array(
-				'error_code' => 'request_failed',
-				'raw' => $e->getJsonBody(),
+				'transaction_id' => $json_body['error']['charge'],
+				'transaction_details' => array(
+					'raw' => $json_body,
+				),
 			) );
 		}
 
@@ -312,6 +317,39 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 		return $camptix->payment_result( $payment_token, CampTix_Plugin::PAYMENT_STATUS_COMPLETED, $payment_data );
 	}
 
+	/**
+	 * Adds a failure reason / code to the post-payment screen whne the payment fails.
+	 *
+	 * @param string $payment_token
+	 * @param int    $result
+	 * @param mixed  $data
+	 */
+	function camptix_payment_result( $payment_token, $result, $data ) {
+		global $camptix;
+
+		if ( $camptix::PAYMENT_STATUS_FAILED == $result && !empty( $data['transaction_details']['raw']['error'] ) ) {
+
+			$error_data = $data['transaction_details']['raw']['error'];
+
+			$message = $error_data['message'];
+			$code = $error_data['code'];
+			if ( isset( $error_data['decline_code'] ) ) {
+				$code .= ' ' . $error_data['decline_code'];
+			}
+
+			$camptix->error(
+				sprintf(
+					__( 'Your payment has failed: %s (%s)', 'camptix-stripe-payment-gateway' ),
+					$message,
+					$code
+				)
+			);
+
+			// Unfortunately there's no way to remove the following failure message, but at least ours will display first:
+			// A payment error has occurred, looks like chosen payment method is not responding. Please try again later.
+
+		}
+	}
 
 	/**
 	 * Submits a single, user-initiated refund request to PayPal and returns the result
