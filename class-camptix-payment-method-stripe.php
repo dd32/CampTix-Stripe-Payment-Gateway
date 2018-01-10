@@ -7,7 +7,7 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 
 	// See https://support.stripe.com/questions/which-currencies-does-stripe-support
 	// Only testing with AUD and USD though.
-	public $supported_currencies = array( 'AUD', 'USD' );
+	public $supported_currencies = array( 'AUD', 'USD', 'EUR' );
 
 	public $supported_features = array(
 		'refund-single' => true,
