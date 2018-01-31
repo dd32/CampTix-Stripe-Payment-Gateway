@@ -59,7 +59,7 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 		}
 
 		wp_register_script( 'stripe-checkout', 'https://checkout.stripe.com/checkout.js', array(), false, true );
-		wp_enqueue_script( 'camptix-stripe', plugins_url( 'camptix-stripe.js', __DIR__ . '/camptix-stripe-gateway.php' ), array( 'stripe-checkout', 'jquery' ), '20180122', true );
+		wp_enqueue_script( 'camptix-stripe', plugins_url( 'camptix-stripe.js', __DIR__ . '/camptix-stripe-gateway.php' ), array( 'stripe-checkout', 'jquery' ), '20180124', true );
 
 		wp_localize_script( 'camptix-stripe', 'CampTixStripeData', array(
 			'public_key'  => $this->options['api_public_key'],
