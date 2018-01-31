@@ -29,9 +29,11 @@ var CampTixStripe = new function() {
 			return;
 		}
 
-		self.stripe_checkout();
-
-		e.preventDefault();
+		// Check if the form is valid before allowing submission! -- NOTE: Requires updated camptix that adds proper required flags
+        if (self.form[0].checkValidity()) {
+            self.stripe_checkout();
+		    e.preventDefault();
+        }
 	}
 
 	self.stripe_checkout = function() {
