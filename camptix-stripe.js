@@ -45,22 +45,27 @@ var CampTixStripe = new function() {
 	}
 
 	self.stripe_checkout = function() {
-		var emails = jQuery.unique(
-			self.form.find('input[type="email"]')
-			.filter( function () { return this.value.length; })
-			.map( function() { return this.value; } )
-		);
-		
+        var emailopt = '';
+        if (!(self.data.ask_email)) {
+		    var emails = jQuery.unique(
+		    	self.form.find('input[type="email"]')
+		    	.filter( function () { return this.value.length; })
+		    	.map( function() { return this.value; } )
+		    );
+            emailopt = ( emails.length == 1 ? emails[0] : '' ) || '';
+        }
+
         var StripeHandler = StripeCheckout.configure({
 			key: self.data.public_key,
-			image: 'https://s.w.org/about/images/desktops/wp-blue-1024x768.png', //'https://stripe.com/img/documentation/checkout/marketplace.png',
+			image: self.data.logo_url ? self.data.logo_url : 'https://stripe.com/img/documentation/checkout/marketplace.png',
 			locale: 'auto',
 			amount: parseInt( this.data.amount ),
 			currency: self.data.currency,
 			description: self.data.description,
 			name: self.data.name,
 			zipCode: true,
-			email: ( emails.length == 1 ? emails[0] : '' ) || '',
+            billingAddress: self.data.ask_billing ? true : false,
+            email: emailopt,
 			token: self.stripe_token_callback
 		});
 

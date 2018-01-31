@@ -1,5 +1,4 @@
 <?php
-
 class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 	public $id = 'stripe';
 	public $name = 'Stripe';
@@ -33,7 +32,6 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 		), $this->get_payment_options() );
 
 		add_filter( 'camptix_register_registration_info_header', array( $this, 'camptix_register_registration_info_header' ) );
-
 		add_filter( 'camptix_payment_result', array( $this, 'camptix_payment_result' ), 10, 3 );
 
 		require_once __DIR__ . '/stripe-php/init.php';
@@ -59,17 +57,19 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 		}
 
 		wp_register_script( 'stripe-checkout', 'https://checkout.stripe.com/checkout.js', array(), false, true );
-		wp_enqueue_script( 'camptix-stripe', plugins_url( 'camptix-stripe.js', __DIR__ . '/camptix-stripe-gateway.php' ), array( 'stripe-checkout', 'jquery' ), '20180124', true );
+		wp_enqueue_script( 'camptix-stripe', plugins_url( 'camptix-stripe.js', __DIR__ . '/camptix-stripe-gateway.php' ), array( 'stripe-checkout', 'jquery' ), '20180131', true );
 
 		wp_localize_script( 'camptix-stripe', 'CampTixStripeData', array(
-			'public_key'  => $this->options['api_public_key'],
-			'name'        => $this->camptix_options['event_name'],
-			'description' => trim( $description ),
-			'amount'      => round($camptix->order['total'] * 100),
-			'currency'    => $this->camptix_options['currency'],
-
-			'token'       => !empty( $_POST['tix_stripe_token'] ) ? wp_unslash( $_POST['tix_stripe_token'] ) : '',
+			'public_key'    => $this->options['api_public_key'],
+			'name'          => $this->camptix_options['event_name'],
+			'description'   => trim( $description ),
+			'amount'        => round($camptix->order['total'] * 100),
+			'currency'      => $this->camptix_options['currency'],
+			'token'         => !empty( $_POST['tix_stripe_token'] ) ? wp_unslash( $_POST['tix_stripe_token'] ) : '',
 			'receipt_email' => !empty( $_POST['tix_stripe_reciept_email'] ) ? wp_unslash( $_POST['tix_stripe_reciept_email'] ) : '',
+            'ask_email'     => $this->options['ask_email'],
+            'ask_billing'   => $this->options['ask_billing'],
+            'logo_url'      => $this->options['logo_url'],
 		) );
 
 		return $filter;
@@ -96,6 +96,11 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 			$this->add_settings_field_helper( 'api_secret_key', __( 'Secret Key',      'camptix-stripe-payment-gateway' ), array( $this, 'field_text'  ) );
 			$this->add_settings_field_helper( 'api_public_key', __( 'Publishable Key', 'camptix-stripe-payment-gateway' ), array( $this, 'field_text'  ) );
 		}
+
+        // Ask a few questions for configuration:
+		$this->add_settings_field_helper( 'ask_email', __( 'Ask for a billing email?', 'camptix-stripe-payment-gateway' ), array( $this, 'field_yesno'  ) );
+		$this->add_settings_field_helper( 'ask_billing', __( 'Ask for a billing address?', 'camptix-stripe-payment-gateway' ), array( $this, 'field_yesno'  ) );
+		$this->add_settings_field_helper( 'logo_url', __( 'URL for checkout logo', 'camptix-stripe-payment-gateway' ), array( $this, 'field_text'  ) );
 	}
 
 	/**
@@ -211,6 +216,18 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 
 		if ( isset( $input['api_public_key'] ) ) {
 			$output['api_public_key'] = $input['api_public_key'];
+		}
+
+		if ( isset( $input['ask_email'] ) ) {
+			$output['ask_email'] = !empty($input['ask_email']);
+		}
+
+		if ( isset( $input['ask_billing'] ) ) {
+			$output['ask_billing'] = !empty($input['ask_billing']);
+		}
+
+		if ( isset( $input['logo_url'] ) ) {
+			$output['logo_url'] = $input['logo_url'];
 		}
 
 		if ( isset( $input['api_predef'] ) ) {
