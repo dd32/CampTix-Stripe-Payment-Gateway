@@ -36,7 +36,7 @@ var CampTixStripe = new function() {
 
 	self.stripe_checkout = function() {
 
-		var emails = jQuery.unique(
+		var emails = jQuery.uniqueSort(
 			self.form.find('input[type="email"]')
 			.filter( function () { return this.value.length; })
 			.map( function() { return this.value; } )
