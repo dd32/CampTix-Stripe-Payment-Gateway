@@ -32,6 +32,8 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 			'api_predef' => '',
 		), $this->get_payment_options() );
 
+		$credentials = $this->get_api_credentials();
+
 		add_filter( 'camptix_register_registration_info_header', array( $this, 'camptix_register_registration_info_header' ) );
 
 		add_filter( 'camptix_payment_result', array( $this, 'camptix_payment_result' ), 10, 3 );
@@ -39,9 +41,37 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 		require_once __DIR__ . '/stripe-php/init.php';
 
 		\Stripe\Stripe::setAppInfo("CampTix", "1.0", "https://github.com/dd32/CampTix-Stripe-Payment-Gateway");
+
+		\Stripe\Stripe::setApiKey( $credentials['api_secret_key'] );
+	}
+
+	/**
+	 * Get the credentials for the API account.
+	 *
+	 * If a standard account is setup, this will just use the value that's
+	 * already in $this->options. If a predefined account is setup, though, it
+	 * will use those instead.
+	 *
+	 * SECURITY WARNING: This must be called on the fly, and saved in a local
+	 * variable instead of $this->options. Storing the predef credentials in
+	 * $this->options would result in them being exposed to the user if they
+	 * switched from a predefined account to a standard one. That happens because
+	 * validate_options() will not strip the predefined credentials when options
+	 * are saved in this scenario, so they would be saved to the database.
+	 *
+	 * validate_options() could be updated to protect against that, but that's
+	 * more susceptible to human error. It's simpler, and therefore safer, to
+	 * just never let predefined credentials into $this->options to begin with.
+	 *
+	 * @return array
+	 */
+	function get_api_credentials() {
 		$options = array_merge( $this->options, $this->get_predefined_account( $this->options['api_predef'] ) );
 
-		\Stripe\Stripe::setApiKey( $options['api_secret_key'] );
+		return array(
+			'api_public_key' => $options['api_public_key'],
+			'api_secret_key' => $options['api_secret_key'],
+		);
 	}
 
 	// Bit hacky, but it'll work.
@@ -52,6 +82,7 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 			return $filter;
 		}
 
+		$credentials = $this->get_api_credentials();
 		$description = '';
 		$ticket_count = array_sum( wp_list_pluck( $camptix->order['items'], 'quantity' ) );
 		foreach ( $camptix->order['items'] as $item ) {
@@ -62,7 +93,7 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 		wp_enqueue_script( 'camptix-stripe', plugins_url( 'camptix-stripe.js', __DIR__ . '/camptix-stripe-gateway.php' ), array( 'stripe-checkout', 'jquery' ), '20170322', true );
 
 		wp_localize_script( 'camptix-stripe', 'CampTixStripeData', array(
-			'public_key'  => $this->options['api_public_key'],
+			'public_key'  => $credentials['api_public_key'],
 			'name'        => $this->camptix_options['event_name'],
 			'description' => trim( $description ),
 			'amount'      => (int) $camptix->order['total'] * 100,
