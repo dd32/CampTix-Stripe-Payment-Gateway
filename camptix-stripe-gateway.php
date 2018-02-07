@@ -11,6 +11,7 @@
  */
 
 class CampTix_Stripe {
+	const VERSION = '0.2-beta';
 	protected static $instance = null;
 
 	private function __construct() {

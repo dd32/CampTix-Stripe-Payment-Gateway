@@ -37,12 +37,6 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 		add_filter( 'camptix_register_registration_info_header', array( $this, 'camptix_register_registration_info_header' ) );
 
 		add_filter( 'camptix_payment_result', array( $this, 'camptix_payment_result' ), 10, 3 );
-
-		require_once __DIR__ . '/stripe-php/init.php';
-
-		\Stripe\Stripe::setAppInfo("CampTix", "1.0", "https://github.com/dd32/CampTix-Stripe-Payment-Gateway");
-
-		\Stripe\Stripe::setApiKey( $credentials['api_secret_key'] );
 	}
 
 	/**
@@ -296,9 +290,7 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 		}
 
 		try {
-
-			$token = \Stripe\Token::retrieve( wp_unslash( $_POST['tix_stripe_token'] ) );
-			
+			$token        = wp_unslash( $_POST['tix_stripe_token'] );
 			$description = '';
 			$ticket_count = array_sum( wp_list_pluck( $camptix->order['items'], 'quantity' ) );
 			foreach ( $camptix->order['items'] as $item ) {
@@ -306,32 +298,15 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 			}
 
 			$statement_descriptor = $camptix->substr_bytes( strip_tags( $this->camptix_options['event_name'] ), 0, 22 );
-
-			$charge = \Stripe\Charge::create( array(
-				'amount'        => $camptix->order['total'] * 100,
-				'currency'      => $this->camptix_options['currency'],
-				'description'   => $this->camptix_options['event_name'],
-				'statement_descriptor' => $statement_descriptor,
-				'source'        => $token->id,
-				'receipt_email' => isset( $_POST['tix_stripe_reciept_email'] ) ? wp_unslash( $_POST['tix_stripe_reciept_email'] ) : false,
-			), array(
-				// The payment token, to ensure that multiple charges are not made.
-				'idempotency_key' => $payment_token,
-			) );
-
+			$receipt_email        = isset( $_POST['tix_stripe_reciept_email'] ) ? wp_unslash( $_POST['tix_stripe_reciept_email'] ) : false;
+			$charge               = $this->charge( $camptix->order, $payment_token, $token, $receipt_email );
 		} catch( Exception $e ) {
 			// A failure happened, since we don't expose the exact details to the user we'll catch every failure here.
 			// Remvoe the POST param of the token so it's not used again.
 			unset( $_POST['tix_stripe_token'] );
 
-			$camptix->log( 'Error during Charge.', null, $e->getMessage() );
-
-			$json_body = $e->getJsonBody();
 			return $camptix->payment_result( $payment_token, CampTix_Plugin::PAYMENT_STATUS_FAILED, array(
-				'transaction_id' => $json_body['error']['charge'],
-				'transaction_details' => array(
-					'raw' => $json_body,
-				),
+				'exception' => $e->getMessage(),
 			) );
 		}
 
@@ -339,13 +314,66 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 			'transaction_id' => $charge->id,
 			'transaction_details' => array(
 				'raw' => array(
-					'token' => $token->jsonSerialize(),
-					'charge' => $charge->jsonSerialize(),
+					'token'  => $token,
+					'charge' => (array) $charge,
 				)
 			),
 		);
 
 		return $camptix->payment_result( $payment_token, CampTix_Plugin::PAYMENT_STATUS_COMPLETED, $payment_data );
+	}
+
+	/**
+	 * Charge the attendee for their ticket via Stripe's API
+	 *
+	 * @param array  $order
+	 * @param string $payment_token
+	 * @param string $token_id
+	 * @param string $receipt_email
+	 *
+	 * @return object
+	 * @throws Exception
+	 */
+	protected function charge( $order, $payment_token, $token_id, $receipt_email ) {
+		/** @var CampTix_Plugin $camptix */
+		global $camptix;
+
+		$credentials          = $this->get_api_credentials();
+		$statement_descriptor = $camptix->substr_bytes( strip_tags( $this->camptix_options['event_name'] ), 0, 22 );
+
+		$request_args = array(
+			'user-agent' => 'CampTix-Stripe/' . CampTix_Stripe::VERSION . ' (https://github.com/dd32/CampTix-Stripe-Payment-Gateway)',
+
+			'body' => array(
+				'amount'               => $order['total'] * 100,
+				'currency'             => $this->camptix_options['currency'],
+				'description'          => $this->camptix_options['event_name'],
+				'statement_descriptor' => $statement_descriptor,
+				'source'               => $token_id,
+				'receipt_email'        => $receipt_email,
+			),
+
+			'headers' => array(
+				'Authorization'   => 'Bearer ' . $credentials['api_secret_key'],
+				'Idempotency-Key' => $payment_token,
+			),
+		);
+
+		$response = wp_remote_post( 'https://api.stripe.com/v1/charges', $request_args );
+
+		if ( is_wp_error( $response ) ) {
+			$camptix->log( 'Error during Charge: ' . $response->get_error_message(), null, $response, 'stripe' );
+			throw new Exception( $response->get_error_message() );
+		}
+
+		$body = json_decode( wp_remote_retrieve_body( $response ) );
+
+		if ( empty( $body->id ) || empty( $body->paid ) || ! $body->paid ) {
+			$camptix->log( 'Error during Charge: Unexpected response.', null, $response, 'stripe' );
+			throw new Exception( 'Unexpected response, missing charge ID.' );
+		}
+
+		return $body;
 	}
 
 	/**
