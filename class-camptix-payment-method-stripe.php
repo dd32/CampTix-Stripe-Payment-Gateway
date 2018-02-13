@@ -84,13 +84,13 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 		}
 
 		wp_register_script( 'stripe-checkout', 'https://checkout.stripe.com/checkout.js', array(), false, true );
-		wp_enqueue_script( 'camptix-stripe', plugins_url( 'camptix-stripe.js', __DIR__ . '/camptix-stripe-gateway.php' ), array( 'stripe-checkout', 'jquery' ), '20170322', true );
+		wp_enqueue_script( 'camptix-stripe', plugins_url( 'camptix-stripe.js', __DIR__ . '/camptix-stripe-gateway.php' ), array( 'stripe-checkout', 'jquery' ), '20180122', true );
 
 		wp_localize_script( 'camptix-stripe', 'CampTixStripeData', array(
 			'public_key'  => $credentials['api_public_key'],
 			'name'        => $this->camptix_options['event_name'],
 			'description' => trim( $description ),
-			'amount'      => (int) $camptix->order['total'] * 100,
+			'amount'      => round($camptix->order['total'] * 100),
 			'currency'    => $this->camptix_options['currency'],
 
 			'token'       => !empty( $_POST['tix_stripe_token'] ) ? wp_unslash( $_POST['tix_stripe_token'] ) : '',
