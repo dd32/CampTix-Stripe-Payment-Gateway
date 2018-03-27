@@ -1,11 +1,11 @@
 <?php
 
 class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
-	public $id = 'stripe';
-	public $name = 'Stripe';
+	public $id          = 'stripe';
+	public $name        = 'Stripe';
 	public $description = 'Stripe';
 
-	/*
+	/**
 	 * Zero-decimal currencies are _not_ included yet, because they require extra logic:
 	 * 'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA', 'PYG', 'RWF', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
 	 *
@@ -25,12 +25,12 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 
 	public $supported_features = array(
 		'refund-single' => true,
-		'refund-all' => true,
+		'refund-all'    => true,
 	);
 
 	/**
 	 * We can have an array to store our options.
-	 * Use $this->get_payment_options() to retrieve them.
+	 * Use `$this->get_payment_options()` to retrieve them.
 	 */
 	protected $options = array();
 
@@ -39,11 +39,11 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 	 *
 	 * @see CampTix_Addon
 	 */
-	function camptix_init() {
+	public function camptix_init() {
 		$this->options = array_merge( array(
 			'api_secret_key' => '',
 			'api_public_key' => '',
-			'api_predef' => '',
+			'api_predef'     => '',
 		), $this->get_payment_options() );
 
 		$credentials = $this->get_api_credentials();
@@ -73,7 +73,7 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 	 *
 	 * @return array
 	 */
-	function get_api_credentials() {
+	public function get_api_credentials() {
 		$options = array_merge( $this->options, $this->get_predefined_account( $this->options['api_predef'] ) );
 
 		return array(
@@ -83,18 +83,18 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 	}
 
 	// Bit hacky, but it'll work.
-	function camptix_register_registration_info_header( $filter ) {
+	public function camptix_register_registration_info_header( $filter ) {
 		global $camptix;
 
 		if ( ! $camptix->order['total'] ) {
 			return $filter;
 		}
 
-		$credentials = $this->get_api_credentials();
-		$description = '';
+		$credentials  = $this->get_api_credentials();
+		$description  = '';
 		$ticket_count = array_sum( wp_list_pluck( $camptix->order['items'], 'quantity' ) );
 		foreach ( $camptix->order['items'] as $item ) {
-			$description .= ( $ticket_count > 1 ?  (int)$item['quantity'] . 'x ' : '' ) . $item['name'] . "\n";
+			$description .= ( $ticket_count > 1 ? (int) $item['quantity'] . 'x ' : '' ) . $item['name'] . "\n";
 		}
 
 		wp_register_script( 'stripe-checkout', 'https://checkout.stripe.com/checkout.js', array(), false, true );
@@ -107,13 +107,13 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 		}
 
 		wp_localize_script( 'camptix-stripe', 'CampTixStripeData', array(
-			'public_key'  => $credentials['api_public_key'],
-			'name'        => $this->camptix_options['event_name'],
-			'description' => trim( $description ),
-			'amount'      => $amount,
-			'currency'    => $this->camptix_options['currency'],
-			'token'       => !empty( $_POST['tix_stripe_token'] ) ? wp_unslash( $_POST['tix_stripe_token'] ) : '',
-			'receipt_email' => !empty( $_POST['tix_stripe_reciept_email'] ) ? wp_unslash( $_POST['tix_stripe_reciept_email'] ) : '',
+			'public_key'    => $credentials['api_public_key'],
+			'name'          => $this->camptix_options['event_name'],
+			'description'   => trim( $description ),
+			'amount'        => $amount,
+			'currency'      => $this->camptix_options['currency'],
+			'token'         => ! empty( $_POST['tix_stripe_token'] )         ? wp_unslash( $_POST['tix_stripe_token'] )         : '',
+			'receipt_email' => ! empty( $_POST['tix_stripe_reciept_email'] ) ? wp_unslash( $_POST['tix_stripe_reciept_email'] ) : '',
 		) );
 
 		return $filter;
@@ -133,7 +133,7 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 	 * @return int
 	 * @throws Exception
 	 */
-	function get_fractional_unit_amount( $order_currency, $base_unit_amount ) {
+	public function get_fractional_unit_amount( $order_currency, $base_unit_amount ) {
 		$fractional_amount = null;
 
 		$currency_multipliers = array(
@@ -148,7 +148,7 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 				'MXN', 'MYR', 'MZN', 'NAD', 'NGN', 'NIO', 'NOK', 'NPR', 'NZD', 'PAB', 'PEN', 'PGK', 'PHP', 'PKR',
 				'PLN', 'PRB', 'QAR', 'RON', 'RSD', 'RUB', 'SAR', 'SBD', 'SCR', 'SDG', 'SEK', 'SGD', 'SHP', 'SLL',
 				'SOS', 'SRD', 'SSP', 'STD', 'SYP', 'SZL', 'THB', 'TJS', 'TMT', 'TOP', 'TRY', 'TTD', 'TVD', 'TWD',
-				'TZS', 'UAH', 'UGX', 'USD', 'UYU', 'UZS', 'VEF', 'WST', 'XCD', 'YER', 'ZAR', 'ZMW'
+				'TZS', 'UAH', 'UGX', 'USD', 'UYU', 'UZS', 'VEF', 'WST', 'XCD', 'YER', 'ZAR', 'ZMW',
 			),
 			1000 => array( 'BHD', 'IQD', 'KWD', 'LYD', 'OMR', 'TND' ),
 		);
@@ -175,17 +175,17 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 	 * helper function to add typical settings fields. Don't forget to
 	 * validate them all in validate_options.
 	 */
-	function payment_settings_fields() {
+	public function payment_settings_fields() {
 		// Allow pre-defined accounts if any are defined by plugins.
 		if ( count( $this->get_predefined_accounts() ) > 0 ) {
-			$this->add_settings_field_helper( 'api_predef', __( 'Predefined Account', 'camptix-stripe-payment-gateway' ), array( $this, 'field_api_predef'	) );
+			$this->add_settings_field_helper( 'api_predef', __( 'Predefined Account', 'camptix-stripe-payment-gateway' ), array( $this, 'field_api_predef' ) );
 		}
 
 		// Settings fields are not needed when a predefined account is chosen.
 		// These settings fields should *never* expose predefined credentials.
 		if ( ! $this->get_predefined_account() ) {
-			$this->add_settings_field_helper( 'api_secret_key', __( 'Secret Key',      'camptix-stripe-payment-gateway' ), array( $this, 'field_text'  ) );
-			$this->add_settings_field_helper( 'api_public_key', __( 'Publishable Key', 'camptix-stripe-payment-gateway' ), array( $this, 'field_text'  ) );
+			$this->add_settings_field_helper( 'api_secret_key', __( 'Secret Key',      'camptix-stripe-payment-gateway' ), array( $this, 'field_text' ) );
+			$this->add_settings_field_helper( 'api_public_key', __( 'Publishable Key', 'camptix-stripe-payment-gateway' ), array( $this, 'field_text' ) );
 		}
 	}
 
@@ -199,7 +199,7 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 	 *
 	 * @param array $args
 	 */
-	function field_api_predef( $args ) {
+	public function field_api_predef( $args ) {
 		$accounts = $this->get_predefined_accounts();
 
 		if ( empty( $accounts ) ) {
@@ -250,7 +250,7 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 	 *
 	 * @return array An array of predefined accounts (or an empty one)
 	 */
-	function get_predefined_accounts() {
+	public function get_predefined_accounts() {
 		static $predefs = false;
 
 		if ( false === $predefs ) {
@@ -272,7 +272,7 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 	 *
 	 * @return array An array with credentials, or an empty array if key not found.
 	 */
-	function get_predefined_account( $key = false ) {
+	public function get_predefined_account( $key = false ) {
 		$accounts = $this->get_predefined_accounts();
 
 		if ( false === $key ) {
@@ -293,7 +293,7 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 	 *
 	 * @return array
 	 */
-	function validate_options( $input ) {
+	public function validate_options( $input ) {
 		$output = $this->options;
 
 		if ( isset( $input['api_secret_key'] ) ) {
@@ -309,8 +309,8 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 			// We do not store predefined credentials in options, only code.
 			if ( $this->get_predefined_account( $input['api_predef'] ) ) {
 				$output = array_merge( $output, array(
-					'api_secret_key'  => '',
-					'api_public_key'  => '',
+					'api_secret_key' => '',
+					'api_public_key' => '',
 				) );
 			} else {
 				$input['api_predef'] = '';
@@ -335,17 +335,17 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 	 *
 	 * @return int One of the CampTix_Plugin::PAYMENT_STATUS_{status} constants
 	 */
-	function payment_checkout( $payment_token ) {
+	public function payment_checkout( $payment_token ) {
 		/** @var CampTix_Plugin $camptix */
 		global $camptix;
 
-		if ( empty( $payment_token ) )
+		if ( empty( $payment_token ) ) {
 			return false;
+		}
 
 		if ( ! in_array( $this->camptix_options['currency'], $this->supported_currencies ) ) {
 			wp_die( __( 'The selected currency is not supported by this payment method.', 'camptix-stripe-payment-gateway' ) );
 		}
-
 
 		$order = $this->get_order( $payment_token );
 
@@ -357,16 +357,16 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 
 		try {
 			$token        = wp_unslash( $_POST['tix_stripe_token'] );
-			$description = '';
+			$description  = '';
 			$ticket_count = array_sum( wp_list_pluck( $camptix->order['items'], 'quantity' ) );
 			foreach ( $camptix->order['items'] as $item ) {
-				$description .= ( $ticket_count > 1 ?  (int)$item['quantity'] . 'x ' : '' ) . $item['name'] . "\n";
+				$description .= ( $ticket_count > 1 ? (int) $item['quantity'] . 'x ' : '' ) . $item['name'] . "\n";
 			}
 
 			$statement_descriptor = $camptix->substr_bytes( strip_tags( $this->camptix_options['event_name'] ), 0, 22 );
 			$receipt_email        = isset( $_POST['tix_stripe_reciept_email'] ) ? wp_unslash( $_POST['tix_stripe_reciept_email'] ) : false;
 			$charge               = $this->charge( $camptix->order, $payment_token, $token, $receipt_email );
-		} catch( Exception $e ) {
+		} catch ( Exception $e ) {
 			// A failure happened, since we don't expose the exact details to the user we'll catch every failure here.
 			// Remvoe the POST param of the token so it's not used again.
 			unset( $_POST['tix_stripe_token'] );
@@ -377,12 +377,12 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 		}
 
 		$payment_data = array(
-			'transaction_id' => $charge->id,
+			'transaction_id'      => $charge->id,
 			'transaction_details' => array(
 				'raw' => array(
 					'token'  => $token,
 					'charge' => (array) $charge,
-				)
+				),
 			),
 		);
 
@@ -449,22 +449,22 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 	 * @param int    $result
 	 * @param mixed  $data
 	 */
-	function camptix_payment_result( $payment_token, $result, $data ) {
+	public function camptix_payment_result( $payment_token, $result, $data ) {
 		global $camptix;
 
-		if ( $camptix::PAYMENT_STATUS_FAILED == $result && !empty( $data['transaction_details']['raw']['error'] ) ) {
+		if ( $camptix::PAYMENT_STATUS_FAILED == $result && ! empty( $data['transaction_details']['raw']['error'] ) ) {
 
 			$error_data = $data['transaction_details']['raw']['error'];
 
 			$message = $error_data['message'];
-			$code = $error_data['code'];
+			$code    = $error_data['code'];
 			if ( isset( $error_data['decline_code'] ) ) {
 				$code .= ' ' . $error_data['decline_code'];
 			}
 
 			$camptix->error(
 				sprintf(
-					__( 'Your payment has failed: %s (%s)', 'camptix-stripe-payment-gateway' ),
+					__( 'Your payment has failed: %1$s (%2$s)', 'camptix-stripe-payment-gateway' ),
 					$message,
 					$code
 				)
@@ -472,7 +472,6 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 
 			// Unfortunately there's no way to remove the following failure message, but at least ours will display first:
 			// A payment error has occurred, looks like chosen payment method is not responding. Please try again later.
-
 		}
 	}
 
@@ -483,7 +482,7 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 	 *
 	 * @return int One of the CampTix_Plugin::PAYMENT_STATUS_{status} constants
 	 */
-	function payment_refund( $payment_token ) {
+	public function payment_refund( $payment_token ) {
 		/** @var $camptix CampTix_Plugin */
 		global $camptix;
 
@@ -505,17 +504,17 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 			),
 		);
 
-		return $camptix->payment_result( $payment_token, $result['status'] , $refund_data );
+		return $camptix->payment_result( $payment_token, $result['status'], $refund_data );
 	}
 
-	/*
+	/**
 	 * Sends a request to PayPal to refund a transaction
 	 *
 	 * @param string $payment_token
 	 *
 	 * @return array
 	 */
-	function send_refund_request( $payment_token ) {
+	public function send_refund_request( $payment_token ) {
 		/** @var $camptix CampTix_Plugin */
 		global $camptix;
 
@@ -523,16 +522,16 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 			'token'          => $payment_token,
 			'transaction_id' => $camptix->get_post_meta_from_payment_token( $payment_token, 'tix_transaction_id' ),
 		);
-		
+
 		try {
 			$charge = \Stripe\Refund::create( array(
 				'charge' => $result['transaction_id'],
 			) );
-			
+
 			$result['refund_transaction_id']      = $charge->id;
 			$result['refund_transaction_details'] = $charge;
 			$result['status']                     = CampTix_Plugin::PAYMENT_STATUS_REFUNDED;
-		} catch( Exception $e ) {
+		} catch ( Exception $e ) {
 			$result['refund_transaction_id']      = false;
 			$result['refund_transaction_details'] = $e->getMessage();
 			$result['status']                     = CampTix_Plugin::PAYMENT_STATUS_REFUND_FAILED;
@@ -542,6 +541,4 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 
 		return $result;
 	}
-
-
 }

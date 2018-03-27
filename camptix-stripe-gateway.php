@@ -11,24 +11,36 @@
  */
 
 class CampTix_Stripe {
-	const VERSION = '0.2-beta';
+	const VERSION              = '0.2-beta';
 	protected static $instance = null;
 
+	/**
+	 * CampTix_Stripe constructor.
+	 */
 	private function __construct() {
 		if ( ! class_exists( 'CampTix_Payment_Method' ) ) {
-			// Just bail.
 			return;
 		}
 
 		add_action( 'camptix_load_addons', array( $this, 'camptix_load_addons' ) );
 	}
 
+	/**
+	 * Provide an instance of the class using the singleton pattern.
+	 *
+	 * @return CampTix_Stripe
+	 */
 	public static function get_instance() {
-		return self::$instance ?
-				self::$instance :
-				( self::$instance = new self );
+		if ( ! self::$instance ) {
+			self::$instance = new self();
+		}
+
+		return self::$instance;
 	}
 
+	/**
+	 * Register this addon with CampTix.
+	 */
 	public function camptix_load_addons() {
 		require_once __DIR__ . '/class-camptix-payment-method-stripe.php';
 
