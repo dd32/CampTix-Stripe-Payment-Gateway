@@ -5,9 +5,23 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 	public $name = 'Stripe';
 	public $description = 'Stripe';
 
-	// See https://support.stripe.com/questions/which-currencies-does-stripe-support
-	// Only testing with AUD and USD though.
-	public $supported_currencies = array( 'AUD', 'USD', 'EUR' );
+	/*
+	 * Zero-decimal currencies are _not_ included yet, because they require extra logic:
+	 * 'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA', 'PYG', 'RWF', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+	 *
+	 * See https://support.stripe.com/questions/which-currencies-does-stripe-support.
+	 */
+	public $supported_currencies = array(
+		'AED', 'AFN', 'ALL', 'AMD', 'ANG', 'AOA', 'ARS', 'AUD', 'AWG', 'AZN', 'BAM', 'BBD', 'BDT', 'BGN', 'BMD',
+		'BND', 'BOB', 'BRL', 'BSD', 'BWP', 'BZD', 'CAD', 'CDF', 'CHF', 'CNY', 'COP', 'CRC', 'CVE', 'CZK', 'DKK',
+		'DOP', 'DZD', 'EGP', 'ETB', 'EUR', 'FJD', 'FKP', 'GBP', 'GEL', 'GIP', 'GMD', 'GTQ', 'GYD', 'HKD', 'HNL',
+		'HRK', 'HTG', 'HUF', 'IDR', 'ILS', 'INR', 'ISK', 'JMD', 'KES', 'KGS', 'KHR', 'KYD', 'KZT', 'LAK', 'LBP',
+		'LKR', 'LRD', 'LSL', 'MAD', 'MDL', 'MKD', 'MMK', 'MNT', 'MOP', 'MRO', 'MUR', 'MVR', 'MWK', 'MXN', 'MYR',
+		'MZN', 'NAD', 'NGN', 'NIO', 'NOK', 'NPR', 'NZD', 'PAB', 'PEN', 'PGK', 'PHP', 'PKR', 'PLN', 'QAR', 'RON',
+		'RSD', 'RUB', 'SAR', 'SBD', 'SCR', 'SEK', 'SGD', 'SHP', 'SLL', 'SOS', 'SRD', 'STD', 'SVC', 'SZL', 'THB',
+		'TJS', 'TOP', 'TRY', 'TTD', 'TWD', 'TZS', 'UAH', 'UGX', 'USD', 'UYU', 'UZS', 'WST', 'XCD', 'YER', 'ZAR',
+		'ZMW',
+	);
 
 	public $supported_features = array(
 		'refund-single' => true,
@@ -86,18 +100,70 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 		wp_register_script( 'stripe-checkout', 'https://checkout.stripe.com/checkout.js', array(), false, true );
 		wp_enqueue_script( 'camptix-stripe', plugins_url( 'camptix-stripe.js', __DIR__ . '/camptix-stripe-gateway.php' ), array( 'stripe-checkout', 'jquery' ), '20170322', true );
 
+		try {
+			$amount = $this->get_fractional_unit_amount( $this->camptix_options['currency'], $camptix->order['total'] );
+		} catch ( Exception $exception ) {
+			$amount = null;
+		}
+
 		wp_localize_script( 'camptix-stripe', 'CampTixStripeData', array(
 			'public_key'  => $credentials['api_public_key'],
 			'name'        => $this->camptix_options['event_name'],
 			'description' => trim( $description ),
-			'amount'      => (int) $camptix->order['total'] * 100,
+			'amount'      => $amount,
 			'currency'    => $this->camptix_options['currency'],
-
 			'token'       => !empty( $_POST['tix_stripe_token'] ) ? wp_unslash( $_POST['tix_stripe_token'] ) : '',
 			'receipt_email' => !empty( $_POST['tix_stripe_reciept_email'] ) ? wp_unslash( $_POST['tix_stripe_reciept_email'] ) : '',
 		) );
 
 		return $filter;
+	}
+
+	/**
+	 * Convert an amount in the currency's base unit to its equivalent fractional unit.
+	 *
+	 * Stripe wants amounts in the fractional unit (e.g., pennies), not the base unit (e.g., dollars). Zero-decimal
+	 * currencies are not included yet, see `$supported_currencies`.
+	 *
+	 * The data here comes from https://en.wikipedia.org/wiki/List_of_circulating_currencies.
+	 *
+	 * @param string $order_currency
+	 * @param int    $base_unit_amount
+	 *
+	 * @return int
+	 * @throws Exception
+	 */
+	function get_fractional_unit_amount( $order_currency, $base_unit_amount ) {
+		$fractional_amount = null;
+
+		$currency_multipliers = array(
+			5    => array( 'MRO', 'MRU' ),
+			100  => array(
+				'AED', 'AFN', 'ALL', 'AMD', 'ANG', 'AOA', 'ARS', 'AUD', 'AWG', 'AZN', 'BAM', 'BBD', 'BDT', 'BGN',
+				'BMD', 'BND', 'BOB', 'BRL', 'BSD', 'BTN', 'BWP', 'BYN', 'BZD', 'CAD', 'CDF', 'CHF', 'CNY', 'COP',
+				'CRC', 'CUC', 'CUP', 'CVE', 'CZK', 'DKK', 'DOP', 'DZD', 'EGP', 'ERN', 'ETB', 'EUR', 'FJD', 'FKP',
+				'GBP', 'GEL', 'GGP', 'GHS', 'GIP', 'GMD', 'GTQ', 'GYD', 'HKD', 'HNL', 'HRK', 'HTG', 'HUF', 'IDR',
+				'ILS', 'IMP', 'INR', 'IRR', 'ISK', 'JEP', 'JMD', 'JOD', 'KES', 'KGS', 'KHR', 'KPW', 'KYD', 'KZT',
+				'LAK', 'LBP', 'LKR', 'LRD', 'LSL', 'MAD', 'MDL', 'MKD', 'MMK', 'MNT', 'MOP', 'MUR', 'MVR', 'MWK',
+				'MXN', 'MYR', 'MZN', 'NAD', 'NGN', 'NIO', 'NOK', 'NPR', 'NZD', 'PAB', 'PEN', 'PGK', 'PHP', 'PKR',
+				'PLN', 'PRB', 'QAR', 'RON', 'RSD', 'RUB', 'SAR', 'SBD', 'SCR', 'SDG', 'SEK', 'SGD', 'SHP', 'SLL',
+				'SOS', 'SRD', 'SSP', 'STD', 'SYP', 'SZL', 'THB', 'TJS', 'TMT', 'TOP', 'TRY', 'TTD', 'TVD', 'TWD',
+				'TZS', 'UAH', 'UGX', 'USD', 'UYU', 'UZS', 'VEF', 'WST', 'XCD', 'YER', 'ZAR', 'ZMW'
+			),
+			1000 => array( 'BHD', 'IQD', 'KWD', 'LYD', 'OMR', 'TND' ),
+		);
+
+		foreach ( $currency_multipliers as $multiplier => $currencies ) {
+			if ( in_array( $order_currency, $currencies, true ) ) {
+				$fractional_amount = (int) $base_unit_amount * $multiplier;
+			}
+		}
+
+		if ( is_null( $fractional_amount ) ) {
+			throw new Exception( "Unknown currency multiplier for $order_currency." );
+		}
+
+		return $fractional_amount;
 	}
 
 	/**
@@ -345,7 +411,7 @@ class CampTix_Payment_Method_Stripe extends CampTix_Payment_Method {
 			'user-agent' => 'CampTix-Stripe/' . CampTix_Stripe::VERSION . ' (https://github.com/dd32/CampTix-Stripe-Payment-Gateway)',
 
 			'body' => array(
-				'amount'               => $order['total'] * 100,
+				'amount'               => $this->get_fractional_unit_amount( $this->camptix_options['currency'], $order['total'] ),
 				'currency'             => $this->camptix_options['currency'],
 				'description'          => $this->camptix_options['event_name'],
 				'statement_descriptor' => $statement_descriptor,
